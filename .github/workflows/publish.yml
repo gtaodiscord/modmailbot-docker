@@ -1,0 +1,176 @@
+name: Publish Modmail image
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: publish-modmail-image
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out image repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --depth=1 origin "$GITHUB_SHA"
+          git checkout --detach FETCH_HEAD
+
+      - name: Discover latest stable Modmail release
+        id: release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          release="$(gh api repos/Dragory/modmailbot/releases/latest)"
+          tag="$(jq -r '.tag_name' <<<"$release")"
+          draft="$(jq -r '.draft' <<<"$release")"
+          prerelease="$(jq -r '.prerelease' <<<"$release")"
+
+          if [[ "$draft" != "false" || "$prerelease" != "false" ]]; then
+            echo "Latest endpoint returned a draft or prerelease" >&2
+            exit 1
+          fi
+
+          version="${tag#v}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Unsupported stable release tag: $tag" >&2
+            exit 1
+          fi
+
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/modmailbot"
+          minor="${version%.*}"
+          major="${version%%.*}"
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "minor=$minor" >> "$GITHUB_OUTPUT"
+          echo "major=$major" >> "$GITHUB_OUTPUT"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GitHub Container Registry
+        shell: bash
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          echo "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+
+      - name: Check immutable image tag
+        id: manifest
+        shell: bash
+        env:
+          image: ${{ steps.release.outputs.image }}
+          version: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          if docker manifest inspect "$image:$version" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check out exact upstream release
+        if: steps.manifest.outputs.exists != 'true'
+        shell: bash
+        env:
+          tag: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch "$tag" --single-branch https://github.com/Dragory/modmailbot.git upstream
+
+      - name: Resolve build metadata
+        if: steps.manifest.outputs.exists != 'true'
+        id: build
+        shell: bash
+        run: |
+          set -euo pipefail
+          engine="$(jq -r '.engines.node // empty' upstream/package.json)"
+          node_major="$(grep -oE '[0-9]+' <<<"$engine" | head -n 1)"
+          if [[ ! "$node_major" =~ ^[0-9]+$ ]]; then
+            echo "Could not derive Node.js major from engines.node: $engine" >&2
+            exit 1
+          fi
+
+          revision="$(git -C upstream rev-parse HEAD)"
+          build_date="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          echo "node_major=$node_major" >> "$GITHUB_OUTPUT"
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+          echo "build_date=$build_date" >> "$GITHUB_OUTPUT"
+
+      - name: Build exact image
+        if: steps.manifest.outputs.exists != 'true'
+        shell: bash
+        env:
+          image: ${{ steps.release.outputs.image }}
+          version: ${{ steps.release.outputs.version }}
+          node_major: ${{ steps.build.outputs.node_major }}
+          revision: ${{ steps.build.outputs.revision }}
+          build_date: ${{ steps.build.outputs.build_date }}
+        run: |
+          set -euo pipefail
+          docker build --platform linux/amd64 \
+            --build-arg "NODE_VERSION=$node_major" \
+            --build-arg "MODMAIL_VERSION=$version" \
+            --build-arg "UPSTREAM_REVISION=$revision" \
+            --build-arg "BUILD_DATE=$build_date" \
+            --tag "$image:$version" \
+            .
+
+      - name: Verify exact image
+        if: steps.manifest.outputs.exists != 'true'
+        shell: pwsh
+        env:
+          image: ${{ steps.release.outputs.image }}
+          version: ${{ steps.release.outputs.version }}
+          revision: ${{ steps.build.outputs.revision }}
+        run: |
+          ./tests/verify-image.ps1 -Image "${env:image}:${env:version}" -Version $env:version -Revision $env:revision
+
+      - name: Publish immutable exact tag
+        if: steps.manifest.outputs.exists != 'true'
+        shell: bash
+        env:
+          image: ${{ steps.release.outputs.image }}
+          version: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          docker push "$image:$version"
+
+      - name: Pull existing exact tag
+        if: steps.manifest.outputs.exists == 'true'
+        shell: bash
+        env:
+          image: ${{ steps.release.outputs.image }}
+          version: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          docker pull "$image:$version"
+
+      - name: Publish moving aliases
+        shell: bash
+        env:
+          image: ${{ steps.release.outputs.image }}
+          version: ${{ steps.release.outputs.version }}
+          minor: ${{ steps.release.outputs.minor }}
+          major: ${{ steps.release.outputs.major }}
+        run: |
+          set -euo pipefail
+          docker tag "$image:$version" "$image:$minor"
+          docker tag "$image:$version" "$image:$major"
+          docker tag "$image:$version" "$image:latest"
+          docker push "$image:$minor"
+          docker push "$image:$major"
+          docker push "$image:latest"

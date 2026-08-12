@@ -1,0 +1,6 @@
+**
+!Dockerfile
+!upstream/
+!upstream/**
+upstream/.git
+upstream/.git/**

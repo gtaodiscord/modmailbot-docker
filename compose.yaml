@@ -1,0 +1,25 @@
+services:
+  modmail:
+    image: ghcr.io/gtaodiscord/modmailbot:${MODMAIL_IMAGE_TAG}
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+    ports:
+      - "8890:8890"
+    volumes:
+      - ./config.ini:/app/config.ini:ro
+      - ./plugins:/app/plugins:ro
+      - ./attachments:/app/attachments
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - modmail
+
+networks:
+  modmail:
+    external: true
+    name: modmail
