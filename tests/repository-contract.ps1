@@ -107,7 +107,7 @@ Require-Match "tests/verify-image.ps1" 'is-number@7\.0\.0' "must exercise generi
 Require-Match "tests/verify-image.ps1" 'git --version' "must verify runtime Git"
 
 Require-Match ".github/workflows/publish.yml" 'cron:\s+"17 \*/6 \* \* \*"' "must check releases every six hours"
-Require-Match ".github/workflows/publish.yml" '(?m)^  workflow_dispatch:$' "must support manual dispatch"
+Require-Match ".github/workflows/publish.yml" '(?m)^  workflow_dispatch:\r?$' "must support manual dispatch"
 Require-Match ".github/workflows/publish.yml" 'contents:\s+read' "must use read-only repository permission"
 Require-Match ".github/workflows/publish.yml" 'packages:\s+write' "must allow GHCR publication"
 Require-Match ".github/workflows/publish.yml" 'cancel-in-progress:\s+false' "must serialize publication"
