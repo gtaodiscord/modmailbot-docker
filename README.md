@@ -13,7 +13,7 @@ Pin production to an exact tag through `MODMAIL_IMAGE_TAG` in `.env`. Review the
 
 ## Runtime
 
-The image runs as the non-root `node` user under Tini. It keeps NPM for Modmail's runtime plugin installer but contains no Git, compiler, Python, Make, or development dependencies
+The image runs as the non-root `node` user under Tini. It keeps Git and NPM for Modmail's runtime plugin installer but contains no compiler, Python, Make, or development dependencies
 
 | Host path | Container path | Access |
 | --- | --- | --- |
@@ -98,7 +98,7 @@ Local and public CI verification covers:
 - Compatible Node.js major version
 - Non-root runtime identity
 - Production dependencies and runtime NPM installation
-- Absence of Git and build tools
+- Runtime Git availability and absence of build tools
 - Plugin readability and attachment writability
 
 Live deployment acceptance still requires private credentials and services:

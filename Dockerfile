@@ -28,7 +28,9 @@ LABEL org.opencontainers.image.title="Dragory Modmail" \
       org.opencontainers.image.created="${BUILD_DATE}" \
       org.opencontainers.image.licenses="MIT"
 
-RUN apk add --no-cache tini \
+USER root
+
+RUN apk add --no-cache tini git \
     && mkdir -p /app/plugins /app/attachments \
     && chown -R node:node /app
 

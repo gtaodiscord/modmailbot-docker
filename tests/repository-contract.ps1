@@ -99,11 +99,12 @@ Require-Match ".env.example" '(?m)^MM_MYSQL_OPTIONS__PASSWORD=$' "must leave the
 Require-Match "Dockerfile" '(?m)^ARG NODE_VERSION=24$' "must default to the current Node major"
 Require-Match "Dockerfile" 'FROM node:\$\{NODE_VERSION\}-alpine AS build' "must use an Alpine build stage"
 Require-Match "Dockerfile" 'npm ci --omit=dev' "must use the upstream lockfile"
-Require-Match "Dockerfile" 'apk add --no-cache tini' "must install Tini in the runtime"
+Require-Match "Dockerfile" 'apk add --no-cache tini git' "must install Tini and Git in the runtime"
 Require-Match "Dockerfile" '(?m)^USER node$' "must run as non-root"
 Require-Match "Dockerfile" 'ENTRYPOINT \["/sbin/tini", "--"\]' "must use Tini"
 Require-Match "Dockerfile" 'CMD \["node", "src/index\.js"\]' "must start Modmail"
 Require-Match "tests/verify-image.ps1" 'is-number@7\.0\.0' "must exercise generic runtime package installation"
+Require-Match "tests/verify-image.ps1" 'git --version' "must verify runtime Git"
 
 Require-Match ".github/workflows/publish.yml" 'cron:\s+"17 \*/6 \* \* \*"' "must check releases every six hours"
 Require-Match ".github/workflows/publish.yml" '(?m)^  workflow_dispatch:$' "must support manual dispatch"
