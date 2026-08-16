@@ -2,7 +2,7 @@
 
 ARG NODE_VERSION=24
 
-FROM node:${NODE_VERSION}-bookworm-slim AS build
+FROM node:${NODE_VERSION}-trixie-slim AS build
 
 WORKDIR /app
 
@@ -15,7 +15,7 @@ COPY upstream/package.json upstream/package-lock.json upstream/.npmrc ./
 RUN npm ci --omit=dev \
     && npm cache clean --force
 
-FROM node:${NODE_VERSION}-bookworm-slim AS runtime
+FROM node:${NODE_VERSION}-trixie-slim AS runtime
 
 ARG MODMAIL_VERSION=unknown
 ARG UPSTREAM_REVISION=unknown
