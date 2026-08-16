@@ -1,19 +1,21 @@
 # Dragory Modmail Docker
 
-Minimal `linux/amd64` Alpine image for [Dragory Modmail](https://github.com/Dragory/modmailbot), published as the public GitHub Container Registry package `ghcr.io/gtaodiscord/modmailbot`
+Minimal `linux/amd64` Debian/glibc image for [Dragory Modmail](https://github.com/Dragory/modmailbot), published as the public GitHub Container Registry package `ghcr.io/gtaodiscord/modmailbot`
 
 GitHub Actions checks stable upstream releases every six hours, builds and verifies each missing release, and publishes it without modifying Modmail or updating a running deployment
 
 ## Image tags
 
-- Immutable exact tags such as `3.11.0` are the production-safe choice
-- Moving discovery tags such as `3.11`, `3`, and `latest` follow newer stable releases
+- Immutable exact wrapper tags such as `3.11.0-r2` are the production-safe choice
+- The `rN` suffix is the image-wrapper revision for the same upstream Modmail release
+- Moving discovery tags such as `3.11`, `3`, and `latest` follow the newest approved wrapper for the latest stable upstream release
+- Older immutable tags such as `3.11.0` remain untouched when the Docker wrapper changes
 
 Pin production to an exact tag through `MODMAIL_IMAGE_TAG` in `.env`. Review the upstream release and back up the database before changing it
 
 ## Runtime
 
-The image runs as the non-root `node` user under Tini. It keeps Git and NPM for Modmail's runtime plugin installer but contains no compiler, Python, Make, or development dependencies
+The image runs as the non-root `node` user under Tini on Debian slim with glibc. It keeps Git and NPM for Modmail's runtime plugin installer but contains no compiler, Python, Make, or development dependencies
 
 | Host path | Container path | Access |
 | --- | --- | --- |
@@ -78,55 +80,6 @@ docker compose logs --tail=200 modmail
 
 1. Read the [upstream release notes](https://github.com/Dragory/modmailbot/releases)
 2. Back up MariaDB using the deployment's existing backup procedure
-3. Change `MODMAIL_IMAGE_TAG` to the new exact version
-4. Pull and recreate only Modmail
-5. Run the live acceptance checks
-
-```bash
-docker compose pull modmail
-docker compose up -d modmail
-docker compose logs --tail=200 modmail
-```
-
-Upstream Modmail controls database migrations and runs them before the bot starts. Do not assume an application rollback is safe after a migration
-
-## Verification boundaries
-
-Local and public CI verification covers:
-
-- Exact packaged Modmail version and upstream revision
-- Compatible Node.js major version
-- Non-root runtime identity
-- Production dependencies and runtime NPM installation
-- Runtime Git availability and absence of build tools
-- Plugin readability and attachment writability
-
-Live deployment acceptance still requires private credentials and services:
-
-- Resolve and connect to the configured database container
-- Load the deployment's configured plugins
-- Connect to Discord and open a test thread
-- Upload an attachment and confirm persistence after recreation
-- Open a generated log through the deployment's public URL
-- Confirm database-backed history remains present
-
-The public workflow never connects to Discord, MariaDB, a deployment host, or a reverse proxy
-
-## Local image build
-
-Place an exact tagged Dragory checkout in `upstream/`, derive its Node.js major from `package.json`, and build:
-
-```bash
-docker build --platform linux/amd64 \
-  --build-arg NODE_VERSION=24 \
-  --build-arg MODMAIL_VERSION=3.11.0 \
-  --build-arg UPSTREAM_REVISION=REPLACE_WITH_UPSTREAM_COMMIT \
-  --tag modmailbot-local:3.11.0 \
-  .
-```
-
-Run `tests/verify-image.ps1` with the same version and revision before publishing
-
-## License
-
-The container wrapper and automation use the MIT License. Dragory Modmail retains its upstream license and notices
+3. Set `MODMAIL_IMAGE_TAG` to the reviewed immutable wrapper tag, for example `3.11.0-r2`
+4. Run `docker compose pull && docker compose up -d`
+5. Check the Modmail logs and verify expected plugins and attachments
