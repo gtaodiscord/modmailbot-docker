@@ -2,25 +2,27 @@
 
 ARG NODE_VERSION=24
 
-FROM node:${NODE_VERSION}-alpine AS build
+FROM node:${NODE_VERSION}-trixie-slim AS build
 
 WORKDIR /app
 
-RUN apk add --no-cache g++ make python3
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends g++ make python3 \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY upstream/package.json upstream/package-lock.json upstream/.npmrc ./
 
 RUN npm ci --omit=dev \
     && npm cache clean --force
 
-FROM node:${NODE_VERSION}-alpine AS runtime
+FROM node:${NODE_VERSION}-trixie-slim AS runtime
 
 ARG MODMAIL_VERSION=unknown
 ARG UPSTREAM_REVISION=unknown
 ARG BUILD_DATE=unknown
 
 LABEL org.opencontainers.image.title="Dragory Modmail" \
-      org.opencontainers.image.description="Minimal Alpine image for Dragory Modmail" \
+      org.opencontainers.image.description="Minimal Debian glibc image for Dragory Modmail" \
       org.opencontainers.image.source="https://github.com/gtaodiscord/modmailbot-docker" \
       org.opencontainers.image.url="https://github.com/Dragory/modmailbot" \
       org.opencontainers.image.version="${MODMAIL_VERSION}" \
@@ -30,7 +32,9 @@ LABEL org.opencontainers.image.title="Dragory Modmail" \
 
 USER root
 
-RUN apk add --no-cache tini git \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tini git ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /app/plugins /app/attachments \
     && chown -R node:node /app
 
@@ -47,5 +51,5 @@ USER node
 
 EXPOSE 8890
 
-ENTRYPOINT ["/sbin/tini", "--"]
+ENTRYPOINT ["tini", "--"]
 CMD ["node", "src/index.js"]

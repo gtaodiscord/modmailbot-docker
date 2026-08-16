@@ -9,6 +9,9 @@ permissions:
   contents: read
   packages: write
 
+env:
+  IMAGE_REVISION: "2"
+
 concurrency:
   group: publish-modmail-image
   cancel-in-progress: false
@@ -51,11 +54,13 @@ jobs:
           fi
 
           image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/modmailbot"
+          exact="${version}-r${IMAGE_REVISION}"
           minor="${version%.*}"
           major="${version%%.*}"
 
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "exact=$exact" >> "$GITHUB_OUTPUT"
           echo "minor=$minor" >> "$GITHUB_OUTPUT"
           echo "major=$major" >> "$GITHUB_OUTPUT"
           echo "image=$image" >> "$GITHUB_OUTPUT"
@@ -73,10 +78,10 @@ jobs:
         shell: bash
         env:
           image: ${{ steps.release.outputs.image }}
-          version: ${{ steps.release.outputs.version }}
+          exact: ${{ steps.release.outputs.exact }}
         run: |
           set -euo pipefail
-          if docker manifest inspect "$image:$version" >/dev/null 2>&1; then
+          if docker manifest inspect "$image:$exact" >/dev/null 2>&1; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
@@ -115,6 +120,7 @@ jobs:
         shell: bash
         env:
           image: ${{ steps.release.outputs.image }}
+          exact: ${{ steps.release.outputs.exact }}
           version: ${{ steps.release.outputs.version }}
           node_major: ${{ steps.build.outputs.node_major }}
           revision: ${{ steps.build.outputs.revision }}
@@ -126,7 +132,7 @@ jobs:
             --build-arg "MODMAIL_VERSION=$version" \
             --build-arg "UPSTREAM_REVISION=$revision" \
             --build-arg "BUILD_DATE=$build_date" \
-            --tag "$image:$version" \
+            --tag "$image:$exact" \
             .
 
       - name: Verify exact image
@@ -134,43 +140,44 @@ jobs:
         shell: pwsh
         env:
           image: ${{ steps.release.outputs.image }}
+          exact: ${{ steps.release.outputs.exact }}
           version: ${{ steps.release.outputs.version }}
           revision: ${{ steps.build.outputs.revision }}
         run: |
-          ./tests/verify-image.ps1 -Image "${env:image}:${env:version}" -Version $env:version -Revision $env:revision
+          ./tests/verify-image.ps1 -Image "${env:image}:${env:exact}" -Version $env:version -Revision $env:revision
 
       - name: Publish immutable exact tag
         if: steps.manifest.outputs.exists != 'true'
         shell: bash
         env:
           image: ${{ steps.release.outputs.image }}
-          version: ${{ steps.release.outputs.version }}
+          exact: ${{ steps.release.outputs.exact }}
         run: |
           set -euo pipefail
-          docker push "$image:$version"
+          docker push "$image:$exact"
 
       - name: Pull existing exact tag
         if: steps.manifest.outputs.exists == 'true'
         shell: bash
         env:
           image: ${{ steps.release.outputs.image }}
-          version: ${{ steps.release.outputs.version }}
+          exact: ${{ steps.release.outputs.exact }}
         run: |
           set -euo pipefail
-          docker pull "$image:$version"
+          docker pull "$image:$exact"
 
       - name: Publish moving aliases
         shell: bash
         env:
           image: ${{ steps.release.outputs.image }}
-          version: ${{ steps.release.outputs.version }}
+          exact: ${{ steps.release.outputs.exact }}
           minor: ${{ steps.release.outputs.minor }}
           major: ${{ steps.release.outputs.major }}
         run: |
           set -euo pipefail
-          docker tag "$image:$version" "$image:$minor"
-          docker tag "$image:$version" "$image:$major"
-          docker tag "$image:$version" "$image:latest"
+          docker tag "$image:$exact" "$image:$minor"
+          docker tag "$image:$exact" "$image:$major"
+          docker tag "$image:$exact" "$image:latest"
           docker push "$image:$minor"
           docker push "$image:$major"
           docker push "$image:latest"

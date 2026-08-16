@@ -40,6 +40,21 @@ Assert-Equal $inspect.Config.User "node" "Runtime user"
 Assert-Equal $inspect.Config.Labels.'org.opencontainers.image.version' $Version "OCI version label"
 Assert-Equal $inspect.Config.Labels.'org.opencontainers.image.revision' $Revision "OCI revision label"
 
+$glibcVersion = Invoke-Docker @(
+  "run", "--rm", "--entrypoint", "node", $Image,
+  "-p", "process.report.getReport().header.glibcVersionRuntime || ''"
+) "glibc runtime"
+if ([string]::IsNullOrWhiteSpace($glibcVersion)) {
+  throw "glibc runtime failed: Node did not report glibc"
+}
+Write-Output "PASS: glibc runtime ($glibcVersion)"
+
+$distroId = Invoke-Docker @(
+  "run", "--rm", "--entrypoint", "sh", $Image,
+  "-c", '. /etc/os-release; printf "%s" "$ID"'
+) "Debian runtime"
+Assert-Equal $distroId "debian" "Debian runtime"
+
 Invoke-Docker @(
   "run", "--rm", "--entrypoint", "sh", $Image,
   "-c", 'git --version >/dev/null'

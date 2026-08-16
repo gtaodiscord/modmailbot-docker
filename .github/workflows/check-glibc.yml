@@ -1,0 +1,60 @@
+name: Check glibc Modmail image
+
+on:
+  push:
+    branches:
+      - feat/glibc-runtime
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Discover latest stable Modmail release
+        id: release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          release="$(gh api repos/Dragory/modmailbot/releases/latest)"
+          tag="$(jq -r '.tag_name' <<<"$release")"
+          version="${tag#v}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Check out upstream release
+        shell: bash
+        env:
+          tag: ${{ steps.release.outputs.tag }}
+        run: git clone --depth 1 --branch "$tag" --single-branch https://github.com/Dragory/modmailbot.git upstream
+
+      - name: Resolve build metadata
+        id: build
+        shell: bash
+        run: |
+          set -euo pipefail
+          engine="$(jq -r '.engines.node // empty' upstream/package.json)"
+          node_major="$(grep -oE '[0-9]+' <<<"$engine" | head -n 1)"
+          revision="$(git -C upstream rev-parse HEAD)"
+          echo "node_major=$node_major" >> "$GITHUB_OUTPUT"
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+
+      - name: Build image
+        shell: bash
+        run: |
+          docker build --platform linux/amd64 \
+            --build-arg "NODE_VERSION=${{ steps.build.outputs.node_major }}" \
+            --build-arg "MODMAIL_VERSION=${{ steps.release.outputs.version }}" \
+            --build-arg "UPSTREAM_REVISION=${{ steps.build.outputs.revision }}" \
+            --build-arg "BUILD_DATE=2026-08-17T00:00:00Z" \
+            --tag modmail-glibc:test .
+
+      - name: Verify image
+        shell: pwsh
+        run: ./tests/verify-image.ps1 -Image modmail-glibc:test -Version '${{ steps.release.outputs.version }}' -Revision '${{ steps.build.outputs.revision }}'

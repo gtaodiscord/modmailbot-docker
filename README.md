@@ -1,19 +1,21 @@
 # Dragory Modmail Docker
 
-Minimal `linux/amd64` Alpine image for [Dragory Modmail](https://github.com/Dragory/modmailbot), published as the public GitHub Container Registry package `ghcr.io/gtaodiscord/modmailbot`
+Minimal `linux/amd64` Debian/glibc image for [Dragory Modmail](https://github.com/Dragory/modmailbot), published as the public GitHub Container Registry package `ghcr.io/gtaodiscord/modmailbot`
 
 GitHub Actions checks stable upstream releases every six hours, builds and verifies each missing release, and publishes it without modifying Modmail or updating a running deployment
 
 ## Image tags
 
-- Immutable exact tags such as `3.11.0` are the production-safe choice
-- Moving discovery tags such as `3.11`, `3`, and `latest` follow newer stable releases
+- Immutable exact wrapper tags such as `3.11.0-r2` are the production-safe choice
+- The `rN` suffix is the image-wrapper revision for the same upstream Modmail release
+- Moving discovery tags such as `3.11`, `3`, and `latest` follow the newest approved wrapper for the latest stable upstream release
+- Older immutable tags such as `3.11.0` remain untouched when the Docker wrapper changes
 
 Pin production to an exact tag through `MODMAIL_IMAGE_TAG` in `.env`. Review the upstream release and back up the database before changing it
 
 ## Runtime
 
-The image runs as the non-root `node` user under Tini. It keeps Git and NPM for Modmail's runtime plugin installer but contains no compiler, Python, Make, or development dependencies
+The image runs as the non-root `node` user under Tini on Debian slim with glibc. It keeps Git and NPM for Modmail's runtime plugin installer but contains no compiler, Python, Make, or development dependencies
 
 | Host path | Container path | Access |
 | --- | --- | --- |
@@ -78,7 +80,7 @@ docker compose logs --tail=200 modmail
 
 1. Read the [upstream release notes](https://github.com/Dragory/modmailbot/releases)
 2. Back up MariaDB using the deployment's existing backup procedure
-3. Change `MODMAIL_IMAGE_TAG` to the new exact version
+3. Set `MODMAIL_IMAGE_TAG` to the reviewed immutable wrapper tag, for example `3.11.0-r2`
 4. Pull and recreate only Modmail
 5. Run the live acceptance checks
 
@@ -96,6 +98,7 @@ Local and public CI verification covers:
 
 - Exact packaged Modmail version and upstream revision
 - Compatible Node.js major version
+- Debian/glibc runtime identity
 - Non-root runtime identity
 - Production dependencies and runtime NPM installation
 - Runtime Git availability and absence of build tools
@@ -121,7 +124,7 @@ docker build --platform linux/amd64 \
   --build-arg NODE_VERSION=24 \
   --build-arg MODMAIL_VERSION=3.11.0 \
   --build-arg UPSTREAM_REVISION=REPLACE_WITH_UPSTREAM_COMMIT \
-  --tag modmailbot-local:3.11.0 \
+  --tag modmailbot-local:3.11.0-r2 \
   .
 ```
 
