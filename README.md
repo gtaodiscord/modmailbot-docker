@@ -81,5 +81,55 @@ docker compose logs --tail=200 modmail
 1. Read the [upstream release notes](https://github.com/Dragory/modmailbot/releases)
 2. Back up MariaDB using the deployment's existing backup procedure
 3. Set `MODMAIL_IMAGE_TAG` to the reviewed immutable wrapper tag, for example `3.11.0-r2`
-4. Run `docker compose pull && docker compose up -d`
-5. Check the Modmail logs and verify expected plugins and attachments
+4. Pull and recreate only Modmail
+5. Run the live acceptance checks
+
+```bash
+docker compose pull modmail
+docker compose up -d modmail
+docker compose logs --tail=200 modmail
+```
+
+Upstream Modmail controls database migrations and runs them before the bot starts. Do not assume an application rollback is safe after a migration
+
+## Verification boundaries
+
+Local and public CI verification covers:
+
+- Exact packaged Modmail version and upstream revision
+- Compatible Node.js major version
+- Debian/glibc runtime identity
+- Non-root runtime identity
+- Production dependencies and runtime NPM installation
+- Runtime Git availability and absence of build tools
+- Plugin readability and attachment writability
+
+Live deployment acceptance still requires private credentials and services:
+
+- Resolve and connect to the configured database container
+- Load the deployment's configured plugins
+- Connect to Discord and open a test thread
+- Upload an attachment and confirm persistence after recreation
+- Open a generated log through the deployment's public URL
+- Confirm database-backed history remains present
+
+The public workflow never connects to Discord, MariaDB, a deployment host, or a reverse proxy
+
+## Local image build
+
+Place an exact tagged Dragory checkout in `upstream/`, derive its Node.js major from `package.json`, and build:
+
+```bash
+docker build --platform linux/amd64 \
+  --build-arg NODE_VERSION=24 \
+  --build-arg MODMAIL_VERSION=3.11.0 \
+  --build-arg UPSTREAM_REVISION=REPLACE_WITH_UPSTREAM_COMMIT \
+  --tag modmailbot-local:3.11.0-r2 \
+  .
+```
+
+Run `tests/verify-image.ps1` with the same version and revision before publishing
+
+## License
+
+The container wrapper and automation use the MIT License. Dragory Modmail retains its upstream license and notices
