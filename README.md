@@ -13,6 +13,15 @@ GitHub Actions checks stable upstream releases every six hours, builds and verif
 
 Pin production to an exact tag through `MODMAIL_IMAGE_TAG` in `.env`. Review the upstream release and back up the database before changing it
 
+## GTAO production deployments
+
+GTAO runs this image for both the main Modmail and Appeals instances. Their Compose definitions, MariaDB services, persistent mounts, plugin configuration, and Komodo deployment settings are maintained centrally in [gtaodiscord/configurations](https://github.com/gtaodiscord/configurations):
+
+- [Main Modmail](https://github.com/gtaodiscord/configurations/tree/main/gtao_modmail)
+- [Appeals](https://github.com/gtaodiscord/configurations/tree/main/gtao_appeals)
+
+Those deployments add the GTAO [Plugin Loader](https://github.com/gtaodiscord/ModmailPluginLoader) and managed Menu, Reply Suggest, and Authentication plugins. This repository publishes the base Modmail image only; image publication does not deploy or restart either production instance
+
 ## Runtime
 
 The image runs as the non-root `node` user under Tini on Debian slim with glibc. It keeps Git and NPM for Modmail's runtime plugin installer but contains no compiler, Python, Make, or development dependencies
