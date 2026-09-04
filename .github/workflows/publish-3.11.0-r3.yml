@@ -1,0 +1,96 @@
+name: Publish Modmail 3.11.0-r3
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: publish-modmail-image
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out image repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --depth=1 origin "$GITHUB_SHA"
+          git checkout --detach FETCH_HEAD
+
+      - name: Check out patched upstream revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init upstream
+          git -C upstream remote add origin https://github.com/Dragory/modmailbot.git
+          git -C upstream fetch --depth=1 origin 536317c964e2c174ca13e35c7a872f560a554e47
+          git -C upstream checkout --detach FETCH_HEAD
+
+      - name: Resolve metadata
+        id: build
+        shell: bash
+        run: |
+          set -euo pipefail
+          engine="$(jq -r '.engines.node // empty' upstream/package.json)"
+          node_major="$(grep -oE '[0-9]+' <<<"$engine" | head -n 1)"
+          if [[ ! "$node_major" =~ ^[0-9]+$ ]]; then
+            echo "Could not derive Node.js major from engines.node: $engine" >&2
+            exit 1
+          fi
+
+          revision="$(git -C upstream rev-parse HEAD)"
+          build_date="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          echo "node_major=$node_major" >> "$GITHUB_OUTPUT"
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+          echo "build_date=$build_date" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        shell: bash
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+        run: echo "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+
+      - name: Build and verify image
+        shell: bash
+        run: |
+          set -euo pipefail
+          if docker manifest inspect ghcr.io/gtaodiscord/modmailbot:3.11.0-r3 >/dev/null 2>&1; then
+            echo "Immutable tag 3.11.0-r3 already exists" >&2
+            exit 1
+          fi
+
+          docker build --platform linux/amd64 \
+            --build-arg "NODE_VERSION=${{ steps.build.outputs.node_major }}" \
+            --build-arg "MODMAIL_VERSION=3.11.0" \
+            --build-arg "UPSTREAM_REVISION=${{ steps.build.outputs.revision }}" \
+            --build-arg "BUILD_DATE=${{ steps.build.outputs.build_date }}" \
+            --tag ghcr.io/gtaodiscord/modmailbot:3.11.0-r3 .
+          pwsh ./tests/verify-image.ps1 \
+            -Image ghcr.io/gtaodiscord/modmailbot:3.11.0-r3 \
+            -Version 3.11.0 \
+            -Revision '${{ steps.build.outputs.revision }}'
+
+      - name: Publish image and aliases
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker push ghcr.io/gtaodiscord/modmailbot:3.11.0-r3
+          docker tag ghcr.io/gtaodiscord/modmailbot:3.11.0-r3 ghcr.io/gtaodiscord/modmailbot:3.11
+          docker tag ghcr.io/gtaodiscord/modmailbot:3.11.0-r3 ghcr.io/gtaodiscord/modmailbot:3
+          docker tag ghcr.io/gtaodiscord/modmailbot:3.11.0-r3 ghcr.io/gtaodiscord/modmailbot:latest
+          docker push ghcr.io/gtaodiscord/modmailbot:3.11
+          docker push ghcr.io/gtaodiscord/modmailbot:3
+          docker push ghcr.io/gtaodiscord/modmailbot:latest
+
+      - name: Verify published manifest
+        shell: bash
+        run: docker manifest inspect ghcr.io/gtaodiscord/modmailbot:3.11.0-r3 >/dev/null
