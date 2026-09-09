@@ -6,12 +6,14 @@ GitHub Actions checks stable upstream releases every six hours, builds and verif
 
 ## Image tags
 
-- Immutable exact wrapper tags such as `3.11.0-r2` are the production-safe choice
+- Immutable exact tags such as `3.11.0-r4` are the production-safe choice
 - The `rN` suffix is the image-wrapper revision for the same upstream Modmail release
 - Moving discovery tags such as `3.11`, `3`, and `latest` follow the newest approved wrapper for the latest stable upstream release
 - Older immutable tags such as `3.11.0` remain untouched when the Docker wrapper changes
 
 Pin production to an exact tag through `MODMAIL_IMAGE_TAG` in `.env`. Review the upstream release and back up the database before changing it
+
+`3.11.0-r4` builds the patched upstream revision containing the attachment and recovery fixes required for this release. Future stable releases build their exact tag only after the publisher confirms that revision remains in its history
 
 ## GTAO production deployments
 
@@ -24,7 +26,7 @@ Those deployments add the GTAO [Plugin Loader](https://github.com/gtaodiscord/Mo
 
 ## Runtime
 
-The image runs as the non-root `node` user under Tini on Debian slim with glibc. It keeps Git and NPM for Modmail's runtime plugin installer but contains no compiler, Python, Make, or development dependencies
+The image runs as the non-root `node` user under Tini on Debian slim with glibc. It keeps Git, NPM, FFmpeg, and FFprobe for Modmail's runtime plugin installer and media handling but contains no compiler, Python, Make, or development dependencies
 
 | Host path | Container path | Access |
 | --- | --- | --- |
@@ -89,7 +91,7 @@ docker compose logs --tail=200 modmail
 
 1. Read the [upstream release notes](https://github.com/Dragory/modmailbot/releases)
 2. Back up MariaDB using the deployment's existing backup procedure
-3. Set `MODMAIL_IMAGE_TAG` to the reviewed immutable wrapper tag, for example `3.11.0-r2`
+3. Set `MODMAIL_IMAGE_TAG` to the reviewed immutable wrapper tag, for example `3.11.0-r4`
 4. Pull and recreate only Modmail
 5. Run the live acceptance checks
 
@@ -110,7 +112,7 @@ Local and public CI verification covers:
 - Debian/glibc runtime identity
 - Non-root runtime identity
 - Production dependencies and runtime NPM installation
-- Runtime Git availability and absence of build tools
+- Runtime Git, FFmpeg, and FFprobe availability and absence of build tools
 - Plugin readability and attachment writability
 
 Live deployment acceptance still requires private credentials and services:
@@ -133,7 +135,7 @@ docker build --platform linux/amd64 \
   --build-arg NODE_VERSION=24 \
   --build-arg MODMAIL_VERSION=3.11.0 \
   --build-arg UPSTREAM_REVISION=REPLACE_WITH_UPSTREAM_COMMIT \
-  --tag modmailbot-local:3.11.0-r2 \
+  --tag modmailbot-local:3.11.0-r4 \
   .
 ```
 

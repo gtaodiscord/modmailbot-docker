@@ -33,7 +33,7 @@ LABEL org.opencontainers.image.title="Dragory Modmail" \
 USER root
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends tini git ca-certificates \
+    && apt-get install -y --no-install-recommends tini git ca-certificates ffmpeg \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /app/plugins /app/attachments \
     && chown -R node:node /app

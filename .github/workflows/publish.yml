@@ -10,7 +10,8 @@ permissions:
   packages: write
 
 env:
-  IMAGE_REVISION: "2"
+  IMAGE_REVISION: "4"
+  PATCH_REVISION: "536317c964e2c174ca13e35c7a872f560a554e47"
 
 concurrency:
   group: publish-modmail-image
@@ -29,6 +30,10 @@ jobs:
           git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
           git fetch --depth=1 origin "$GITHUB_SHA"
           git checkout --detach FETCH_HEAD
+
+      - name: Verify repository contract
+        shell: pwsh
+        run: ./tests/repository-contract.ps1
 
       - name: Discover latest stable Modmail release
         id: release
@@ -87,14 +92,28 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Check out exact upstream release
+      - name: Check out compatible upstream release
         if: steps.manifest.outputs.exists != 'true'
         shell: bash
         env:
           tag: ${{ steps.release.outputs.tag }}
+          version: ${{ steps.release.outputs.version }}
+          PATCH_REVISION: ${{ env.PATCH_REVISION }}
         run: |
           set -euo pipefail
-          git clone --depth 1 --branch "$tag" --single-branch https://github.com/Dragory/modmailbot.git upstream
+          git clone --filter=blob:none --no-checkout https://github.com/Dragory/modmailbot.git upstream
+          git -C upstream fetch --filter=blob:none origin "$PATCH_REVISION"
+
+          if [[ "$version" == "3.11.0" ]]; then
+            git -C upstream checkout --detach "$PATCH_REVISION"
+          else
+            git -C upstream fetch --filter=blob:none origin "refs/tags/$tag:refs/tags/$tag"
+            git -C upstream checkout --detach "refs/tags/$tag"
+            if ! git -C upstream merge-base --is-ancestor "$PATCH_REVISION" HEAD; then
+              echo "Upstream release $tag does not contain required fixes from $PATCH_REVISION" >&2
+              exit 1
+            fi
+          fi
 
       - name: Resolve build metadata
         if: steps.manifest.outputs.exists != 'true'

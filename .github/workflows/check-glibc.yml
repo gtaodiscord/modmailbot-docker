@@ -15,6 +15,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Verify repository contract
+        shell: pwsh
+        run: ./tests/repository-contract.ps1
+
       - name: Discover latest stable Modmail release
         id: release
         shell: bash
