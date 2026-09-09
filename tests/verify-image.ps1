@@ -63,6 +63,12 @@ Write-Output "PASS: Runtime Git"
 
 Invoke-Docker @(
   "run", "--rm", "--entrypoint", "sh", $Image,
+  "-c", 'ffmpeg -version >/dev/null && ffprobe -version >/dev/null'
+) "Runtime FFmpeg and FFprobe" | Out-Null
+Write-Output "PASS: Runtime FFmpeg and FFprobe"
+
+Invoke-Docker @(
+  "run", "--rm", "--entrypoint", "sh", $Image,
   "-c", 'for tool in python3 make g++ gcc; do ! command -v "$tool" >/dev/null 2>&1 || exit 1; done'
 ) "Runtime toolchain absence" | Out-Null
 Write-Output "PASS: Runtime toolchain absence"
