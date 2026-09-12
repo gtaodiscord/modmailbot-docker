@@ -42,8 +42,11 @@ WORKDIR /app
 
 COPY --from=build --chown=node:node /app/node_modules ./node_modules
 COPY --chown=node:node upstream/ ./
+COPY patches/logs-timestamps.cjs /tmp/logs-timestamps.cjs
 
-RUN rm -rf /app/.git \
+RUN node /tmp/logs-timestamps.cjs \
+    && rm /tmp/logs-timestamps.cjs \
+    && rm -rf /app/.git \
     && mkdir -p /app/plugins /app/attachments \
     && chown -R node:node /app
 

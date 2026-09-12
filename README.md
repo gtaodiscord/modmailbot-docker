@@ -2,18 +2,22 @@
 
 Minimal `linux/amd64` Debian/glibc image for [Dragory Modmail](https://github.com/Dragory/modmailbot), published as the public GitHub Container Registry package `ghcr.io/gtaodiscord/modmailbot`
 
-GitHub Actions checks stable upstream releases every six hours, builds and verifies each missing release, and publishes it without modifying Modmail or updating a running deployment
+GitHub Actions checks stable upstream releases every six hours, builds and verifies each missing release, and publishes it without updating a running deployment
 
 ## Image tags
 
-- Immutable exact tags such as `3.11.0-r4` are the production-safe choice
+- Immutable exact tags such as `3.11.0-r5` are the production-safe choice
 - The `rN` suffix is the image-wrapper revision for the same upstream Modmail release
 - Moving discovery tags such as `3.11`, `3`, and `latest` follow the newest approved wrapper for the latest stable upstream release
 - Older immutable tags such as `3.11.0` remain untouched when the Docker wrapper changes
 
 Pin production to an exact tag through `MODMAIL_IMAGE_TAG` in `.env`. Review the upstream release and back up the database before changing it
 
-`3.11.0-r4` builds the patched upstream revision containing the attachment and recovery fixes required for this release. Future stable releases build their exact tag only after the publisher confirms that revision remains in its history
+`3.11.0-r5` retains the upstream revision containing the attachment and recovery fixes and adds Discord timestamps to `!logs`. Dates include the year and render in each viewer's timezone and locale using Discord's `f` style
+
+The Docker build applies a small compatibility fix only when the exact legacy date-formatting block is present. Already-fixed or refactored upstream code is left unchanged, so this fix adds no ancestry requirement or merge conflict to future upstream releases. If upstream changes that block differently, localized dates need to be checked again. Future stable releases still build their exact tag only after the publisher confirms the existing attachment/recovery revision remains in their history
+
+The OCI revision label identifies the upstream base commit; the image-wrapper revision identifies this build-time adjustment. The upstream checkout itself remains unchanged
 
 ## GTAO production deployments
 
@@ -91,7 +95,7 @@ docker compose logs --tail=200 modmail
 
 1. Read the [upstream release notes](https://github.com/Dragory/modmailbot/releases)
 2. Back up MariaDB using the deployment's existing backup procedure
-3. Set `MODMAIL_IMAGE_TAG` to the reviewed immutable wrapper tag, for example `3.11.0-r4`
+3. Set `MODMAIL_IMAGE_TAG` to the reviewed immutable wrapper tag, for example `3.11.0-r5`
 4. Pull and recreate only Modmail
 5. Run the live acceptance checks
 
@@ -114,6 +118,7 @@ Local and public CI verification covers:
 - Production dependencies and runtime NPM installation
 - Runtime Git, FFmpeg, and FFprobe availability and absence of build tools
 - Plugin readability and attachment writability
+- Renderable `!logs` timestamps in Unix seconds for the 3.11.0 compatibility build
 
 Live deployment acceptance still requires private credentials and services:
 
@@ -128,14 +133,14 @@ The public workflow never connects to Discord, MariaDB, a deployment host, or a 
 
 ## Local image build
 
-Place an exact tagged Dragory checkout in `upstream/`, derive its Node.js major from `package.json`, and build:
+Place the publisher-selected Dragory checkout in `upstream/`: revision `536317c964e2c174ca13e35c7a872f560a554e47` for 3.11.0, or a compatible exact release tag for later versions. Derive its Node.js major from `package.json`, and build:
 
 ```bash
 docker build --platform linux/amd64 \
   --build-arg NODE_VERSION=24 \
   --build-arg MODMAIL_VERSION=3.11.0 \
   --build-arg UPSTREAM_REVISION=REPLACE_WITH_UPSTREAM_COMMIT \
-  --tag modmailbot-local:3.11.0-r4 \
+  --tag modmailbot-local:3.11.0-r5 \
   .
 ```
 

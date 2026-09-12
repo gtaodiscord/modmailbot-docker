@@ -10,7 +10,7 @@ permissions:
   packages: write
 
 env:
-  IMAGE_REVISION: "4"
+  IMAGE_REVISION: "5"
   PATCH_REVISION: "536317c964e2c174ca13e35c7a872f560a554e47"
 
 concurrency:
