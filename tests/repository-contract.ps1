@@ -115,7 +115,7 @@ Require-Match ".github/workflows/publish.yml" 'packages:\s+write' "must allow GH
 Require-Match ".github/workflows/publish.yml" 'cancel-in-progress:\s+false' "must serialize publication"
 Require-Match ".github/workflows/publish.yml" 'repos/Dragory/modmailbot/releases/latest' "must use the upstream stable release endpoint"
 Require-Match ".github/workflows/publish.yml" 'docker manifest inspect' "must preserve existing exact tags"
-Require-Match ".github/workflows/publish.yml" 'IMAGE_REVISION: "4"' "must publish the FFmpeg wrapper revision"
+Require-Match ".github/workflows/publish.yml" 'IMAGE_REVISION: "5"' "must publish the localized logs wrapper revision"
 Require-Match ".github/workflows/publish.yml" 'PATCH_REVISION: "536317c964e2c174ca13e35c7a872f560a554e47"' "must preserve the required upstream fixes"
 Require-Match ".github/workflows/publish.yml" 'git clone --filter=blob:none --no-checkout https://github\.com/Dragory/modmailbot\.git upstream' "must retain enough upstream history for source verification"
 Reject-Match ".github/workflows/publish.yml" 'git clone[^\r\n]*--depth' "must not use shallow history for source verification"

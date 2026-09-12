@@ -34,6 +34,15 @@ $packagedVersion = Invoke-Docker @(
 ) "Packaged Modmail version"
 Assert-Equal $packagedVersion $Version "Packaged Modmail version"
 
+# The compatibility fix targets 3.11.0. Future upstream layouts may differ.
+if ($Version -eq "3.11.0") {
+  $timestampCheck = Get-Content -LiteralPath (Join-Path $PSScriptRoot "logs-timestamps.cjs") -Raw
+  Invoke-Docker @(
+    "run", "--rm", "--env", "TZ=America/Los_Angeles", "--entrypoint", "node", $Image,
+    "-e", $timestampCheck
+  ) "Localized logs timestamps" | Write-Output
+}
+
 $inspectJson = Invoke-Docker @("image", "inspect", $Image) "Image metadata"
 $inspect = @($inspectJson | ConvertFrom-Json)[0]
 Assert-Equal $inspect.Config.User "node" "Runtime user"

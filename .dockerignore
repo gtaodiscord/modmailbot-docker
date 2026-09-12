@@ -1,5 +1,7 @@
 **
 !Dockerfile
+!patches/
+!patches/logs-timestamps.cjs
 !upstream/
 !upstream/**
 upstream/.git
