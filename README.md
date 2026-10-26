@@ -4,6 +4,12 @@ Minimal `linux/amd64` Debian/glibc image for [Dragory Modmail](https://github.co
 
 GitHub Actions checks stable upstream releases every six hours, builds and verifies each missing release, and publishes it without updating a running deployment
 
+This README describes the checked-out wrapper and workflows. The publisher currently specifies revision `5`; this is not evidence that an image has been published or either GTAO instance uses it.
+
+## Prerequisites
+
+For a standalone installation, use Docker Engine with the Compose plugin on an AMD64 host, a configured Discord bot, a reachable database when using MariaDB, and a private configuration file. The bundled Compose file is a generic example, not the GTAO deployment definition. Before changing image behavior, inspect `Dockerfile`, `.github/workflows/publish.yml`, and the verification scripts below.
+
 ## Image tags
 
 - Immutable exact tags such as `3.11.0-r5` are the production-safe choice
@@ -21,7 +27,7 @@ The OCI revision label identifies the upstream base commit; the image-wrapper re
 
 ## GTAO production deployments
 
-GTAO runs this image for both the main Modmail and Appeals instances. Their Compose definitions, MariaDB services, persistent mounts, plugin configuration, and Komodo deployment settings are maintained centrally in [gtaodiscord/configurations](https://github.com/gtaodiscord/configurations):
+The main Modmail and Appeals deployment definitions reference this image family; inspect their current pinned tags and runtime separately. Their Compose definitions, MariaDB services, persistent mounts, plugin configuration, and Komodo deployment settings are maintained centrally in [gtaodiscord/configurations](https://github.com/gtaodiscord/configurations):
 
 - [Main Modmail](https://github.com/gtaodiscord/configurations/tree/main/gtao_modmail)
 - [Appeals](https://github.com/gtaodiscord/configurations/tree/main/gtao_appeals)
@@ -50,7 +56,7 @@ mkdir -p plugins attachments
 
 `config.example.ini` is copied verbatim from Dragory's v3.11.0 sample. Keep deployment-specific values only in `config.ini`, which Git ignores
 
-Set `MM_TOKEN` in `.env`, then configure the required IDs and any optional settings in the private `config.ini`. Never commit `.env`, `config.ini`, mounted plugins, or attachments
+The example `.env` retains the initial `3.11.0` tag. Explicitly select the reviewed exact wrapper tag before starting. Set `MM_TOKEN` in `.env`, then configure the required IDs and any optional settings in the private `config.ini`. Never commit `.env`, `config.ini`, mounted plugins, or attachments
 
 For an external MariaDB container, add the settings documented in [Dragory's configuration reference](https://github.com/Dragory/modmailbot/blob/master/docs/configuration.md) to the private `config.ini`. Use the database container's Docker DNS alias and container port `3306`, not a host-published port. The password can remain in `.env` as `MM_MYSQL_OPTIONS__PASSWORD`
 
@@ -85,13 +91,15 @@ Do not recursively change the full application directory or database storage
 ## Start
 
 ```bash
-docker compose config
+docker compose config --quiet
 docker compose pull
 docker compose up -d
 docker compose logs --tail=200 modmail
 ```
 
-## Update production
+`config --quiet` validates Compose without printing resolved secrets. Successful startup logs alone do not prove end-user delivery; complete the live acceptance checks below.
+
+## Update a standalone installation
 
 1. Read the [upstream release notes](https://github.com/Dragory/modmailbot/releases)
 2. Back up MariaDB using the deployment's existing backup procedure
@@ -133,7 +141,11 @@ The public workflow never connects to Discord, MariaDB, a deployment host, or a 
 
 ## Local image build
 
-Place the publisher-selected Dragory checkout in `upstream/`: revision `536317c964e2c174ca13e35c7a872f560a554e47` for 3.11.0, or a compatible exact release tag for later versions. Derive its Node.js major from `package.json`, and build:
+Use Docker and Git for builds. PowerShell 7 is needed for the verification scripts (CI provides it, Ubuntu may not). Place the publisher-selected Dragory checkout in ignored `upstream/`, including `package.json`, `package-lock.json`, and `.npmrc`.
+
+To reproduce the current publisher's `3.11.0-r5` source, use upstream commit `536317c964e2c174ca13e35c7a872f560a554e47`, not the unpatched `v3.11.0` tag. For later versions, the publisher requires an exact stable tag containing that commit. Derive the Node.js major from the checkout's `package.json` and set `UPSTREAM_REVISION` to its actual `git rev-parse HEAD` output. The Dockerfile records these arguments but does not verify them.
+
+Example build after preparing and checking the source:
 
 ```bash
 docker build --platform linux/amd64 \
@@ -144,7 +156,31 @@ docker build --platform linux/amd64 \
   .
 ```
 
-Run `tests/verify-image.ps1` with the same version and revision before publishing
+Run the static repository contract from this directory with PowerShell 7:
+
+```powershell
+./tests/repository-contract.ps1
+```
+
+For a built local image:
+
+```powershell
+./tests/verify-image.ps1 -Image modmailbot-local:3.11.0-r5 -Version 3.11.0 -Revision REPLACE_WITH_UPSTREAM_COMMIT
+```
+
+The image verifier starts disposable containers, creates temporary bind mounts, and downloads a small npm package to test runtime installation. It needs Docker and registry access, but does not start Modmail or contact Discord or a database. Review those effects before running it.
+
+The pull-request image workflow builds the latest stable upstream tag directly; it does not use the publisher's patched-source selection. Its success alone does not verify the `3.11.0-r5` source. The scheduled publisher skips builds for an existing exact image tag and refreshes moving aliases.
+
+## Troubleshooting
+
+- External network not found: inspect Docker networks and create `modmail` only for a new standalone installation.
+- Database connection failure: confirm network membership, DNS alias, private credentials, and container port `3306`.
+- Attachment permission denied: inspect the attachment directory's ownership and write permissions for UID/GID 1000 before changing them.
+- Plugin initialization failure: inspect Modmail logs, plugin paths, and configuration. The generic read-only plugin mount may not fit plugins that write managed releases; use the deployment repository's mount contract for PluginLoader.
+- Startup or migration failure after an update: preserve logs and the database backup. Diagnose the failure before restarting repeatedly or rolling back.
+
+Keep resolved Compose output and logs private when they contain tokens, credentials, or message content.
 
 ## License
 
